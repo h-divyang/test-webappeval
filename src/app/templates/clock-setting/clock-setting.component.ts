@@ -17,6 +17,9 @@ import * as moment_t from "moment-timezone";
 import { Ng4LoadingSpinnerService } from "ng4-loading-spinner";
 import { ClockService } from "src/app/service/clock.service";
 import { FormBuilder, FormGroup, Validators } from "@angular/forms";
+import { CentralSaveService } from "src/app/service/central-save.service";
+import { filter } from "rxjs/operators";
+import { Components } from "src/app/enum/components.enum";
 
 @Component({
   selector: "app-clock-setting",
@@ -63,7 +66,8 @@ export class ClockSettingComponent implements OnInit, OnChanges {
     private commonFunction: CommonFunction,
     private storage: LocalStorageService,
     private _clockService: ClockService,
-    private formBuilder: FormBuilder
+    private formBuilder: FormBuilder,
+    private _centralSaveService: CentralSaveService
   ) {
     this.activeMirrorDetails = this.storage.get("activeMirrorDetails");
     this.clockFormGroup = this.formBuilder.group({
@@ -75,7 +79,16 @@ export class ClockSettingComponent implements OnInit, OnChanges {
     });
   }
 
-  ngOnInit() {}
+  ngOnInit() {
+    this._centralSaveService.saveTriggered$.pipe(filter(component => component === Components.CLOCK_SETTING)).subscribe(() => {
+      if (this.clockFormGroup.dirty) {
+        this.saveClockSettings();
+      } else {
+        this.clockSettingModal.hide();
+      }
+      this.clockFormGroup.markAsPristine();
+    });
+  }
 
   createClockForm(clockWidget: any) {
     this.clockFormGroup = this.formBuilder.group({
@@ -101,6 +114,8 @@ export class ClockSettingComponent implements OnInit, OnChanges {
         let timeZoneId =
           this.clockWidgetObject.data.clockWidgetDetail.timeZoneId;
         this.mapCurrentlySelectedTimezone(timeZoneId);
+		// Register the CLOCK_SETTING component to listen for save triggers from CentralSaveService.
+        this._centralSaveService.registerSave(Components.CLOCK_SETTING);
         this.setBackgroundWidgetDetail();
       }
     }
@@ -175,6 +190,15 @@ export class ClockSettingComponent implements OnInit, OnChanges {
 
   selectTimezone() {
     this.mapCurrentlySelectedTimezone(this.clockFormGroup.value.timeZoneId);
+  }
+
+  /**
+   * @description
+   * Triggers a save event for all registered components using `CentralSaveService`.
+   * Each registered component will receive a notification to execute its save logic.
+   */
+  save() {
+    this._centralSaveService.triggerSave();
   }
 
   saveClockSettings() {

@@ -1,12 +1,17 @@
 import {
   AfterViewInit,
+  Component,
   EventEmitter,
   HostListener,
   Input,
   OnChanges,
+  OnInit,
   Output,
 } from "@angular/core";
-import { Component, OnInit } from "@angular/core";
+import { Subscription } from "rxjs";
+import { filter, takeUntil } from "rxjs/operators";
+import { Components } from "src/app/enum/components.enum";
+import { CentralSaveService } from "src/app/service/central-save.service";
 import {
   Fonts,
   SupportedFontSize,
@@ -40,27 +45,9 @@ export class WidgetBgSettingComponent
     "news",
   ];
 
-  bgSettingOptions = {
-    transparency: 5,
-    blur: 0,
-    shadow: false,
-    corner: "square",
-    backgroundColor: "#2c82fd",
-    isMirrorBackgroundSettingEnabled: true,
-    id: "",
-    widgetname: "",
-    isNameVisible: false,
-    titleFontSize: "smallest",
-    fontSize: "smallest",
-
-    fontFamily: "Open Sans",
-    fontColor: "#212529",
-
-    titleFontFamily: "Open Sans",
-    titleFontColor: "#212529",
-    titleBackgroundColor: "#FCFCFC",
-    titleAlignment: "center",
-  };
+  bgSettingOptions: any;
+  initBgSettingOptions: any;
+  saveSubscription: Subscription;
 
   @Input() widgetType: any;
 
@@ -127,7 +114,15 @@ export class WidgetBgSettingComponent
     "mealplan",
   ];
 
-  constructor() {
+  initSelectedTitleFontColor: string = "default";
+  initSelectedTitleBGColor: string = "default";
+  initSelectedFontColor: string = "default";
+  initSelectedBGFormat: string = "default";
+  initBackgroundEffect: string = "Transparency";
+
+  constructor(
+    private _centralSaveService: CentralSaveService
+  ) {
     let defaultFontFamily = {
       id: 0,
       googleFontName: "default",
@@ -135,6 +130,27 @@ export class WidgetBgSettingComponent
       fontCategory: "default",
     };
     this.availableFontFamilies.unshift(defaultFontFamily);
+    this.initializeBgSettingOptions({
+      transparency: 5,
+      blur: 0,
+      shadow: false,
+      corner: "square",
+      backgroundColor: "#2c82fd",
+      isMirrorBackgroundSettingEnabled: true,
+      id: "",
+      widgetname: "",
+      isNameVisible: false,
+      titleFontSize: "smallest",
+      fontSize: "smallest",
+
+      fontFamily: "Open Sans",
+      fontColor: "#212529",
+
+      titleFontFamily: "Open Sans",
+      titleFontColor: "#212529",
+      titleBackgroundColor: "#FCFCFC",
+      titleAlignment: "center",
+    });
   }
   ngAfterViewInit(): void {
     window.scrollTo(0, 0);
@@ -154,7 +170,32 @@ export class WidgetBgSettingComponent
     }
   }
 
-  ngOnInit() {}
+  /**
+   * @description
+   * Subscribes to the `saveTriggered$` observable from `CentralSaveService` 
+   * to listen for save events related to the `WIDGET_BG_SETTING` component.
+   * 
+   * - Uses `takeUntil(this._centralSaveService.unsubscribe$)` to manage unsubscription 
+   * - Checks if any background settings have changed by comparing the current 
+   *   values with their initial states.
+   * - If changes are detected, it triggers `onBackgroundOptionEmit()` to save the settings.
+   * - If no changes are found, it emits `closeModalEvent` to close the modal.
+   */
+  ngOnInit() {
+    this._centralSaveService.saveTriggered$.pipe(takeUntil(this._centralSaveService.unsubscribe$))
+      .pipe(filter(component => component === Components.WIDGET_BG_SETTING))
+      .subscribe(() => {
+      if (JSON.stringify(this.bgSettingOptions) !== JSON.stringify(this.initBgSettingOptions) ||
+      (this.selectedTitleFontColor !== this.initSelectedTitleFontColor) ||
+      (this.selectedTitleBGColor !== this.initSelectedTitleBGColor) ||
+      (this.selectedFontColor !== this.initSelectedFontColor) ||
+      (this.selectedBGFormat !== this.initSelectedBGFormat)) {
+        this.onBackgroundOptionEmit();
+      } else {
+        this.closeModalEvent.emit(true);
+      }
+    });
+  }
 
   toggleOptions(event: Event, type: string): void {
     if (type == "body") {
@@ -185,40 +226,77 @@ export class WidgetBgSettingComponent
 
     if (changes.widgetbgsetting !== undefined) {
       if (changes.widgetbgsetting.currentValue !== undefined) {
-        this.bgSettingOptions = changes.widgetbgsetting.currentValue;
+        // Initialize background setting options with the new value from changes.
+        this.initializeBgSettingOptions(changes.widgetbgsetting.currentValue);
 
+        // Register WIDGET_BG_SETTING with CentralSaveService to enable save triggers.
+        this._centralSaveService.registerSave(Components.WIDGET_BG_SETTING);
         if (this.bgSettingOptions.widgetname == undefined) {
           this.bgSettingOptions["widgetname"] = "";
         }
 
         if (this.bgSettingOptions.isMirrorBackgroundSettingEnabled == true) {
           this.selectedBGFormat = "default";
+          this.initSelectedBGFormat = "default"; // Store initial value for future comparison.
         } else {
           this.selectedBGFormat = "custom format";
+          this.initSelectedBGFormat = "custom format"; // Store initial value for future comparison.
         }
 
         if (this.bgSettingOptions.titleFontColor != "default") {
           this.selectedTitleFontColor = "custom color";
+          this.initSelectedTitleFontColor = "custom color"; // Store initial value for future comparison.
+        } else {
+          this.initSelectedTitleFontColor = this.selectedTitleFontColor; // Maintain initial state for comparison.
         }
 
         if (this.bgSettingOptions.titleBackgroundColor != "default") {
           this.selectedTitleBGColor = "custom color";
+          this.initSelectedTitleBGColor = "custom color";
+        } else {
+          this.initSelectedTitleBGColor = this.selectedTitleBGColor; // Maintain initial state for comparison.
         }
 
         if (this.bgSettingOptions.fontColor != "default") {
           this.selectedFontColor = "custom color";
+          this.initSelectedFontColor = "custom color"; // Store initial value for future comparison.
+        } else {
+          this.initSelectedFontColor = this.selectedFontColor; // Maintain initial state for comparison.
         }
 
         if (this.bgSettingOptions.blur == 0) {
           this.backgroundEffect = "Transparency";
+          this.initBackgroundEffect = "Transparency"; // Store initial value for future comparison.
         } else {
           this.backgroundEffect = "Blur";
+          this.initBackgroundEffect = "Blur"; // Store initial value for future comparison.
         }
       }
     }
   }
 
   onGetBackgroundColor() {}
+
+  /**
+   * @description
+   * Initializes the background setting options by storing the provided settings 
+   * and creating a copy of them for comparison purposes.
+   *
+   * @param bgSettingOptions - The background setting options to initialize.
+   */
+  initializeBgSettingOptions(bgSettingOptions: any) {
+    this.bgSettingOptions = bgSettingOptions;
+    this.initBgSettingOptions = { ...bgSettingOptions };
+  }
+
+  /**
+   * @description
+   * Triggers a save event for all registered components using `CentralSaveService`.  
+   * This notifies all subscribed components to execute their respective save logic.
+   */
+  save() {
+    this._centralSaveService.triggerSave();
+  }
 
   onBackgroundOptionEmit() {
     if (this.selectedTitleBGColor == "default") {

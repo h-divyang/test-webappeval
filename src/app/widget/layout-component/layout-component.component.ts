@@ -26,6 +26,7 @@ import { takeUntil } from "rxjs/operators";
 import { Observable, Subject, Subscription } from "rxjs";
 import { MangoMirrorConstants } from "src/app/util/constants";
 import { DragulaService } from "ng2-dragula";
+import { CentralSaveService } from "src/app/service/central-save.service";
 
 declare var StripeCheckout: any;
 
@@ -240,7 +241,8 @@ export class LayoutComponentComponent implements OnInit {
     private activeRouter: ActivatedRoute,
     private _widgetUtil: WidgetsUtil,
     private _subscriptionUtil: SubscriptionUtil,
-    private dragulaService: DragulaService
+    private dragulaService: DragulaService,
+    private _centralSaveService: CentralSaveService
   ) {
     try {
       this.dragulaService.createGroup("pagecontainer", {
@@ -1072,6 +1074,8 @@ export class LayoutComponentComponent implements OnInit {
         } else {
           this.clockWidgetObject = this.createWidgetSetting(category);
         }
+        // When the clock setting modal is hidden, clear all registered components from CentralSaveService.
+        this.clockSettingModal.onHidden.subscribe(() => this._centralSaveService.clear());
         break;
       case "news":
         this.newsChangeDetector = !this.newsChangeDetector;
