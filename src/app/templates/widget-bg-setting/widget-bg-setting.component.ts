@@ -47,7 +47,6 @@ export class WidgetBgSettingComponent
 
   bgSettingOptions: any;
   initBgSettingOptions: any;
-  saveSubscription: Subscription;
 
   @Input() widgetType: any;
 
